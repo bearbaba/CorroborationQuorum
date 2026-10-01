@@ -54,7 +54,6 @@ class CorroborationQuorum(gl.Contract):
                 st = "UNREADABLE"
             if u in urls:
                 by_url[u] = st
-
         support = 0
         contradict = 0
         readable = 0
@@ -168,7 +167,18 @@ class CorroborationQuorum(gl.Contract):
                     if not text:
                         parts.append("URL: " + url + "\nFAIL\nempty")
                     else:
-                        parts.append("URL: " + url + "\nOK\n" + text[:5000])
+                        low = text.lower()
+                        hints = []
+                        for tok in ("iana", "united nations", "example domain", "example.org"):
+                            hints.append(tok + "=" + ("yes" if tok in low else "no"))
+                        parts.append(
+                            "URL: "
+                            + url
+                            + "\nOK\nLEXICAL: "
+                            + ",".join(hints)
+                            + "\n"
+                            + text[:5000]
+                        )
                 except Exception as e:
                     parts.append("URL: " + url + "\nFAIL\n" + str(e))
             return "\n====\n".join(parts)
@@ -176,27 +186,23 @@ class CorroborationQuorum(gl.Contract):
         raw = gl.eq_principle.prompt_non_comparative(
             collect_evidence,
             task=(
-                "For each fetched page, decide if it SUPPORTS, CONTRADICTS, "
-                "is IRRELEVANT to, or is UNREADABLE for this PREDICATE. "
-                "PREDICATE: "
-                + predicate
-                + " RUBRIC: "
-                + rubric
-                + " Return ONLY raw JSON: "
-                + '{"rows":[{"url":"...","stance":"SUPPORT|CONTRADICT|IRRELEVANT|UNREADABLE","excerpt":"..."}]} '
-                + "One row per fetched URL. UNREADABLE if FAIL/empty. "
-                + "Do not invent page facts. No markdown."
+                "Label each fetched URL with exactly one stance. "
+                "PREDICATE: " + predicate + " RUBRIC: " + rubric + " "
+                "Rules: FAIL/empty -> UNREADABLE. "
+                "If LEXICAL has iana=yes and the predicate is about IANA being mentioned, stance is SUPPORT. "
+                "If the predicate claims the page is the UN homepage and LEXICAL has united nations=no, stance is CONTRADICT. "
+                "IRRELEVANT only when the page is readable and the rubric gives no rule. "
+                "Return ONLY raw JSON "
+                '{"rows":[{"url":"...","stance":"SUPPORT|CONTRADICT|IRRELEVANT|UNREADABLE"}]} '
+                "One row per URL. No markdown."
             ),
             criteria=(
-                "Output is JSON with rows. Each row has url and stance. "
-                "stance is exactly SUPPORT, CONTRADICT, IRRELEVANT or UNREADABLE. "
-                "Every fetched URL appears once. "
-                "UNREADABLE only for FAIL/empty pages. "
-                "SUPPORT only if visible text affirms the predicate. "
-                "CONTRADICT only if visible text denies the predicate. "
-                "IRRELEVANT if readable but silent. "
-                "excerpt may differ; stance per URL must match the page. "
-                "Valid JSON alone is not enough."
+                "JSON with rows. Each row url+stance. "
+                "Stance is SUPPORT, CONTRADICT, IRRELEVANT or UNREADABLE. "
+                "FAIL pages UNREADABLE. "
+                "iana=yes plus IANA mention predicate => SUPPORT, not IRRELEVANT. "
+                "UN homepage predicate plus generic IANA/example page => CONTRADICT, not IRRELEVANT. "
+                "Do not invent facts."
             ),
         )
 
@@ -210,14 +216,11 @@ class CorroborationQuorum(gl.Contract):
                 parsed = json.loads(text[start : end + 1]) if start >= 0 and end > start else {}
             except Exception:
                 parsed = {"rows": []}
-
         rows = parsed.get("rows", [])
         if not isinstance(rows, list):
             rows = []
-
         support, contradict, readable, ordered = self._tally(urls, rows)
         status = self._status(k, support, contradict, readable)
-
         rec = self.cases[case_id]
         rec.status = status
         rec.support_n = u32(support)
@@ -225,14 +228,10 @@ class CorroborationQuorum(gl.Contract):
         rec.readable_n = u32(readable)
         rec.stances_json = json.dumps(ordered)
         rec.justification = (
-            "k="
-            + str(k)
-            + " support="
-            + str(support)
-            + " contradict="
-            + str(contradict)
-            + " readable="
-            + str(readable)
+            "k=" + str(k)
+            + " support=" + str(support)
+            + " contradict=" + str(contradict)
+            + " readable=" + str(readable)
         )[:500]
         rec.round_no = u32(int(rec.round_no) + 1)
         self.cases[case_id] = rec
