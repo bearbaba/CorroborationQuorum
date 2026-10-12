@@ -35,9 +35,32 @@ OPEN
 SEALED
   ↓
 UPHELD | REFUTED | SPLIT | INCONCLUSIVE
-  ↓
+  ↓  clerk-only challenge
 CHALLENGED
+  ↓  adjudicate again
+UPHELD | REFUTED | SPLIT | INCONCLUSIVE
 ```
+
+## Challenge authorization
+
+A finalized result cannot be challenged by an arbitrary caller.
+
+Only the address stored as the case `clerk` when `open_case` was called may invoke `challenge`.
+
+The challenge transition now enforces:
+
+```text
+sender == case.clerk
+status in UPHELD | REFUTED | SPLIT | INCONCLUSIVE
+reason is non-empty
+```
+
+A challenge writes to a dedicated `challenge_reason` field and increments
+`challenge_count`. It does **not** overwrite `justification`, which remains
+the deterministic explanation of the most recently finalized consensus round.
+
+This prevents unrelated addresses from repeatedly invalidating settled cases
+or replacing their consensus justification.
 
 ## Source evaluation
 
@@ -66,11 +89,17 @@ For `k` accepted supporting or contradicting sources:
 
 This preserves the contradiction veto while keeping the final aggregation deterministic.
 
-## Live deployment
+## Deployment status
 
-* Network: Studionet
-* Address: `0x62B2b0eF4b101cd27b93BF138d4c07ce8Ad8Eb54`
-* Studio: https://studio.genlayer.com/?import-contract=0x62B2b0eF4b101cd27b93BF138d4c07ce8Ad8Eb54
+The previous Studionet deployment:
+
+`0x62B2b0eF4b101cd27b93BF138d4c07ce8Ad8Eb54`
+
+predates the clerk-only challenge authorization fix and is therefore
+**superseded** for review purposes.
+
+The corrected source on `main` must be redeployed before the steward evidence
+is updated. The new deployment address will be recorded here after deployment.
 
 ## Verified cases
 
@@ -150,10 +179,10 @@ This demonstrates that the classifier can produce `CONTRADICT` for multiple inde
 
 ## Source version
 
-The deployed source corresponds to commit:
+Current corrected source includes the challenge authorization fix introduced by:
 
 ```text
-8e20da4 Fix corroboration source classification
+dbff5a0 Protect challenge transition from arbitrary callers
 ```
 
 The contract source is located at:
@@ -161,3 +190,6 @@ The contract source is located at:
 ```text
 contracts/CorroborationQuorum.py
 ```
+
+After the corrected source is deployed, this section will be updated with the
+matching deployment address and final source commit.
