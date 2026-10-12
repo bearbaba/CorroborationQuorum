@@ -89,17 +89,53 @@ For `k` accepted supporting or contradicting sources:
 
 This preserves the contradiction veto while keeping the final aggregation deterministic.
 
-## Deployment status
+## Live deployment
 
-The previous Studionet deployment:
+* Network: Studionet
+* Corrected address: `0x72C8b0062D38f990Eb5Bd0c2E890C730976B7Eff`
+* Studio: https://studio.genlayer.com/?import-contract=0x72C8b0062D38f990Eb5Bd0c2E890C730976B7Eff
+* Explorer: https://explorer-studio.genlayer.com/address/0x72C8b0062D38f990Eb5Bd0c2E890C730976B7Eff
 
-`0x62B2b0eF4b101cd27b93BF138d4c07ce8Ad8Eb54`
+The previous deployment `0x62B2b0eF4b101cd27b93BF138d4c07ce8Ad8Eb54`
+is superseded and should not be used for review.
 
-predates the clerk-only challenge authorization fix and is therefore
-**superseded** for review purposes.
+### Live challenge authorization verification
 
-The corrected source on `main` must be redeployed before the steward evidence
-is updated. The new deployment address will be recorded here after deployment.
+A finalized case was created by clerk:
+
+`0x4C7cb73aC8F8999af21cfc9fF4cF2333a9508Dcb`
+
+with result:
+
+```text
+status            = UPHELD
+justification     = k=1 support=1 contradict=0 readable=1
+challenge_reason  = ""
+challenge_count   = 0
+round_no          = 1
+```
+
+An unrelated address:
+
+`0xD6b8A3A5eB329410D9504784812b8569afA8C2aF`
+
+attempted to challenge the finalized case. The case state remained unchanged,
+demonstrating that an unauthorized caller cannot move the case to
+`CHALLENGED` or overwrite the finalized justification.
+
+The clerk then challenged the same case successfully. The resulting state was:
+
+```text
+status            = CHALLENGED
+justification     = k=1 support=1 contradict=0 readable=1
+challenge_reason  = clerk requested reconsideration
+challenge_count   = 1
+round_no          = 1
+```
+
+This verifies both required security properties: challenge authority is limited
+to the case clerk, and the previous consensus justification is preserved instead
+of being overwritten by the challenge reason.
 
 ## Verified cases
 
@@ -179,17 +215,23 @@ This demonstrates that the classifier can produce `CONTRADICT` for multiple inde
 
 ## Source version
 
-Current corrected source includes the challenge authorization fix introduced by:
+The corrected challenge authorization logic was introduced by:
 
 ```text
 dbff5a0 Protect challenge transition from arbitrary callers
 ```
 
-The contract source is located at:
+Regression coverage was added in:
+
+```text
+db5ec4e Add regression tests for challenge authorization
+```
+
+The deployed contract source matches:
 
 ```text
 contracts/CorroborationQuorum.py
 ```
 
-After the corrected source is deployed, this section will be updated with the
-matching deployment address and final source commit.
+on the current `main` branch. Subsequent README updates do not modify the
+deployed contract source.
