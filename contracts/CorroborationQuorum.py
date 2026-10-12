@@ -25,6 +25,8 @@ class Case:
     readable_n: u32
     stances_json: str
     justification: str
+    challenge_reason: str
+    challenge_count: u32
     round_no: u32
 
 
@@ -89,6 +91,8 @@ class CorroborationQuorum(gl.Contract):
             readable_n=u32(0),
             stances_json="[]",
             justification="",
+            challenge_reason="",
+            challenge_count=u32(0),
             round_no=u32(0),
         )
 
@@ -390,6 +394,10 @@ or
             + " readable="
             + str(readable)
         )
+        # A successful adjudication starts a fresh finalized round.
+        # Preserve challenge history via challenge_count, but clear the
+        # active challenge reason after the case is adjudicated again.
+        rec.challenge_reason = ""
         rec.round_no = u32(int(rec.round_no) + 1)
 
         self.cases[case_id] = rec
@@ -401,12 +409,23 @@ or
         if rec.status not in FINALS:
             raise Exception("nothing to challenge")
 
-        if not reason.strip():
+        # Challenge authority is deliberately narrow: only the case clerk
+        # that opened the case may invalidate a finalized round. This
+        # prevents arbitrary third-party griefing of settled cases.
+        if rec.clerk != gl.message.sender_address:
+            raise Exception("only clerk may challenge")
+
+        clean_reason = reason.strip()
+
+        if not clean_reason:
             raise Exception("reason required")
 
         rec.status = "CHALLENGED"
-        rec.justification = reason.strip()[:500]
+        rec.challenge_reason = clean_reason[:500]
+        rec.challenge_count = u32(int(rec.challenge_count) + 1)
 
+        # Do not overwrite the adjudication justification. It remains an
+        # immutable explanation of the last finalized consensus round.
         self.cases[case_id] = rec
 
     @gl.public.view
@@ -431,6 +450,8 @@ or
                 "readable_n": int(rec.readable_n),
                 "stances_json": rec.stances_json,
                 "justification": rec.justification,
+                "challenge_reason": rec.challenge_reason,
+                "challenge_count": int(rec.challenge_count),
                 "round_no": int(rec.round_no),
             }
         )
